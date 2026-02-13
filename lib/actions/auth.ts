@@ -1,23 +1,23 @@
-'use server';
+"use server";
 
-import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
-import type { LoginFormValues, SignupFormValues } from '@/lib/validations/auth';
-import { loginSchema, signupSchema } from '@/lib/validations/auth';
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import type { LoginFormValues, SignupFormValues } from "@/lib/validations/auth";
+import { loginSchema, signupSchema } from "@/lib/validations/auth";
 
 export type ActionResult =
   | { success: true }
   | { success: false; error: string };
 
 export async function loginAction(
-  data: LoginFormValues,
+  data: LoginFormValues
 ): Promise<ActionResult> {
   const parsed = loginSchema.safeParse(data);
   console.log(parsed);
   if (!parsed.success) {
     return {
       success: false,
-      error: parsed.error.flatten().formErrors[0] ?? 'Validation failed',
+      error: parsed.error.flatten().formErrors[0] ?? "Validation failed",
     };
   }
   const supabase = await createClient();
@@ -25,17 +25,17 @@ export async function loginAction(
   if (error) {
     return { success: false, error: error.message };
   }
-  redirect('/');
+  redirect("/");
 }
 
 export async function signupAction(
-  data: SignupFormValues,
+  data: SignupFormValues
 ): Promise<ActionResult> {
   const parsed = signupSchema.safeParse(data);
   if (!parsed.success) {
     return {
       success: false,
-      error: parsed.error.flatten().formErrors[0] ?? 'Validation failed',
+      error: parsed.error.flatten().formErrors[0] ?? "Validation failed",
     };
   }
   const supabase = await createClient();
@@ -46,11 +46,11 @@ export async function signupAction(
   if (error) {
     return { success: false, error: error.message };
   }
-  redirect('/');
+  redirect("/");
 }
 
 export async function signOutAction(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect('/login');
+  redirect("/login");
 }

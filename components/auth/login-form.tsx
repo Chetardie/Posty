@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { zodResolver } from "@hookform/resolvers/zod"
-import Link from "next/link"
-import { Controller, useForm } from "react-hook-form"
-import { loginAction } from "@/lib/actions/auth"
-import type { LoginFormValues } from "@/lib/validations/auth"
-import { loginSchema } from "@/lib/validations/auth"
-import { Button } from "@/components/ui/button"
+import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
+import { Controller, useForm } from "react-hook-form";
+import { loginAction } from "@/lib/actions/auth";
+import type { LoginFormValues } from "@/lib/validations/auth";
+import { loginSchema } from "@/lib/validations/auth";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -14,14 +14,14 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   Field,
   FieldError,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 export function LoginForm() {
   const form = useForm<LoginFormValues>({
@@ -30,14 +30,14 @@ export function LoginForm() {
       email: "",
       password: "",
     },
-  })
+  });
 
   async function handleSubmit(data: LoginFormValues) {
-    form.clearErrors("root")
-    const result = await loginAction(data)
+    form.clearErrors("root");
+    const result = await loginAction(data);
     if (!result.success) {
-      form.setError("root", { message: result.error })
-      return
+      form.setError("root", { message: result.error });
+      return;
     }
   }
 
@@ -45,12 +45,17 @@ export function LoginForm() {
     <Card className="w-full sm:max-w-md">
       <CardHeader>
         <CardTitle>Log in</CardTitle>
-        <CardDescription>Enter your credentials to access your account.</CardDescription>
+        <CardDescription>
+          Enter your credentials to access your account.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form id="login-form" onSubmit={form.handleSubmit(handleSubmit)}>
           {form.formState.errors.root && (
-            <FieldError errors={[form.formState.errors.root]} className="mb-4" />
+            <FieldError
+              errors={[form.formState.errors.root]}
+              className="mb-4"
+            />
           )}
           <FieldGroup>
             <Controller
@@ -67,7 +72,9 @@ export function LoginForm() {
                     aria-invalid={fieldState.invalid}
                     placeholder="name@example.com"
                   />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
@@ -84,7 +91,9 @@ export function LoginForm() {
                     autoComplete="current-password"
                     aria-invalid={fieldState.invalid}
                   />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
@@ -101,11 +110,14 @@ export function LoginForm() {
         </Button>
         <p className="text-muted-foreground text-center text-sm">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-primary underline underline-offset-4">
+          <Link
+            href="/signup"
+            className="text-primary underline underline-offset-4"
+          >
             Sign up
           </Link>
         </p>
       </CardFooter>
     </Card>
-  )
+  );
 }

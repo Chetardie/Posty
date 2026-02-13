@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { zodResolver } from "@hookform/resolvers/zod"
-import Link from "next/link"
-import { Controller, useForm } from "react-hook-form"
-import { signupAction } from "@/lib/actions/auth"
-import type { SignupFormValues } from "@/lib/validations/auth"
-import { signupSchema } from "@/lib/validations/auth"
-import { Button } from "@/components/ui/button"
+import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
+import { Controller, useForm } from "react-hook-form";
+import { signupAction } from "@/lib/actions/auth";
+import type { SignupFormValues } from "@/lib/validations/auth";
+import { signupSchema } from "@/lib/validations/auth";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -14,14 +14,14 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   Field,
   FieldError,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 export function SignupForm() {
   const form = useForm<SignupFormValues>({
@@ -31,14 +31,14 @@ export function SignupForm() {
       password: "",
       confirmPassword: "",
     },
-  })
+  });
 
   async function handleSubmit(data: SignupFormValues) {
-    form.clearErrors("root")
-    const result = await signupAction(data)
+    form.clearErrors("root");
+    const result = await signupAction(data);
     if (!result.success) {
-      form.setError("root", { message: result.error })
-      return
+      form.setError("root", { message: result.error });
+      return;
     }
   }
 
@@ -51,7 +51,10 @@ export function SignupForm() {
       <CardContent>
         <form id="signup-form" onSubmit={form.handleSubmit(handleSubmit)}>
           {form.formState.errors.root && (
-            <FieldError errors={[form.formState.errors.root]} className="mb-4" />
+            <FieldError
+              errors={[form.formState.errors.root]}
+              className="mb-4"
+            />
           )}
           <FieldGroup>
             <Controller
@@ -68,7 +71,9 @@ export function SignupForm() {
                     aria-invalid={fieldState.invalid}
                     placeholder="name@example.com"
                   />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
@@ -85,7 +90,9 @@ export function SignupForm() {
                     autoComplete="new-password"
                     aria-invalid={fieldState.invalid}
                   />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
@@ -94,7 +101,9 @@ export function SignupForm() {
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="signup-confirm-password">Confirm password</FieldLabel>
+                  <FieldLabel htmlFor="signup-confirm-password">
+                    Confirm password
+                  </FieldLabel>
                   <Input
                     {...field}
                     id="signup-confirm-password"
@@ -102,7 +111,9 @@ export function SignupForm() {
                     autoComplete="new-password"
                     aria-invalid={fieldState.invalid}
                   />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
@@ -119,11 +130,14 @@ export function SignupForm() {
         </Button>
         <p className="text-muted-foreground text-center text-sm">
           Already have an account?{" "}
-          <Link href="/login" className="text-primary underline underline-offset-4">
+          <Link
+            href="/login"
+            className="text-primary underline underline-offset-4"
+          >
             Log in
           </Link>
         </p>
       </CardFooter>
     </Card>
-  )
+  );
 }

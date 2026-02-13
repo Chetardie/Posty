@@ -26,7 +26,7 @@ export function Header() {
   const { user, isLoading } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4">
+    <header className="bg-background sticky top-0 z-50 flex h-14 items-center justify-between border-b px-4">
       <Link href="/" className="font-semibold">
         Posty
       </Link>
@@ -36,7 +36,9 @@ export function Header() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Avatar className="size-8">
-                  <AvatarFallback>{getInitials(user.email ?? "")}</AvatarFallback>
+                  <AvatarFallback>
+                    {getInitials(user.email ?? "")}
+                  </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
