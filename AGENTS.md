@@ -4,44 +4,43 @@ Guidance for AI agents and developers working on this codebase.
 
 ## Stack
 
-- **Next.js 16** (App Router)
-- **React 19**
-- **TypeScript**
-- **shadcn/ui** (radix-nova)
-- **Tailwind CSS**
-- **Supabase** (auth, planned)
+- **Next.js 16** (App Router), **React 19**, **TypeScript**
+- **Prisma** (PostgreSQL via Supabase)
+- **Supabase** (Auth, Storage for post images)
+- **shadcn/ui**, **Tailwind CSS**
+
+## Data (Prisma)
+
+- **Post**: content, imageUrl?, authorId?, soft delete via deletedAt
+- **Comment**: tree-structured (parentId), same fields as Post
+- Use `db` from `lib/db.ts`; `authorId` is Supabase auth user id (nullable for guests)
 
 ## Principles
 
-Follow modern React and Next.js patterns. Prefer Server Actions over client-side API calls or custom API routes.
+Prefer Server Actions over API routes. Re-validate with Zod on the server. Return `{ success: true }` or `{ success: false; error: string }`.
 
-## Server Actions
+## Forms
 
-- Use Server Actions (`"use server"`) for mutations, form submissions, and data writes.
-- Place actions in `lib/actions/` (e.g. `lib/actions/auth.ts`).
-- Re-validate with Zod on the server for defense in depth.
-- Return typed results: `{ success: true }` or `{ success: false; error: string }`.
-
-## Forms (Hybrid Approach)
-
-- **Client**: React Hook Form + Zod + `@hookform/resolvers` for validation and UX.
-- **Submit**: On valid submit, call a Server Action with the validated data.
-- Do not use `onSubmit` callbacks that bypass Server Actions; the action is the handler.
+- React Hook Form + Zod + `@hookform/resolvers`
+- On submit: call Server Action with validated data (or FormData for file uploads)
 
 ## File Structure
 
 ```
 lib/
-  actions/       Server Actions
-  validations/    Zod schemas (shared client/server)
+  actions/       auth.ts, post.ts
+  validations/   auth.ts, post.ts
+  db.ts          Prisma singleton
+  supabase/      client, server, proxy
 components/
-  auth/           Auth forms and related components
-  ui/             shadcn primitives
-app/              Next.js App Router pages
+  auth/          login-form, signup-form
+  post/          create-post-form
+  ui/            shadcn primitives
+app/             page, login, signup
+prisma/         schema, migrations
 ```
 
 ## Validation
 
-- Define schemas in `lib/validations/`.
-- Export inferred types: `type X = z.infer<typeof xSchema>`.
-- Reuse schemas in both client forms and Server Actions.
+- Schemas in `lib/validations/`; export `type X = z.infer<typeof xSchema>`
+- Reuse in client forms and Server Actions
