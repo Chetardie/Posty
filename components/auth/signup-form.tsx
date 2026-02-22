@@ -35,7 +35,11 @@ export function SignupForm() {
 
   async function handleSubmit(data: SignupFormValues) {
     form.clearErrors("root");
-    const result = await signupAction(data);
+    const formData = new FormData();
+    formData.append("email", data.email);
+    formData.append("password", data.password);
+    formData.append("confirmPassword", data.confirmPassword);
+    const result = await signupAction(formData);
     if (!result.success) {
       form.setError("root", { message: result.error });
       return;

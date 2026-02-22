@@ -34,7 +34,10 @@ export function LoginForm() {
 
   async function handleSubmit(data: LoginFormValues) {
     form.clearErrors("root");
-    const result = await loginAction(data);
+    const formData = new FormData();
+    formData.append("email", data.email);
+    formData.append("password", data.password);
+    const result = await loginAction(formData);
     if (!result.success) {
       form.setError("root", { message: result.error });
       return;

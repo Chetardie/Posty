@@ -1,8 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { createPostAction } from "@/lib/actions/post";
+import { ImagePlus, X } from "lucide-react";
 import type { CreatePostFormValues } from "@/lib/validations/post";
 import { createPostFormSchema } from "@/lib/validations/post";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,14 @@ import {
 } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 
-export function CreatePostForm() {
+interface CreatePostFormProps {
+  onSuccess?: () => void;
+}
+
+export function CreatePostForm({ onSuccess }: CreatePostFormProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showImageField, setShowImageField] = useState(false);
+
   const form = useForm<CreatePostFormValues>({
     resolver: zodResolver(createPostFormSchema),
     defaultValues: {
@@ -43,6 +52,11 @@ export function CreatePostForm() {
       return;
     }
     form.reset();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setShowImageField(false);
+    onSuccess?.();
   }
 
   return (
@@ -51,10 +65,7 @@ export function CreatePostForm() {
         <CardTitle>Create post</CardTitle>
       </CardHeader>
       <CardContent>
-        <form
-          id="create-post-form"
-          onSubmit={form.handleSubmit(handleSubmit)}
-        >
+        <form id="create-post-form" onSubmit={form.handleSubmit(handleSubmit)}>
           {form.formState.errors.root && (
             <FieldError
               errors={[form.formState.errors.root]}
@@ -67,7 +78,6 @@ export function CreatePostForm() {
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="post-content">Content</FieldLabel>
                   <Textarea
                     {...field}
                     id="post-content"
@@ -84,35 +94,81 @@ export function CreatePostForm() {
             <Controller
               name="image"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="post-image">Image</FieldLabel>
-                  <input
-                    id="post-image"
-                    type="file"
-                    accept="image/*"
-                    className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-lg border bg-transparent px-2.5 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-primary-foreground"
-                    onChange={(e) =>
-                      field.onChange(e.target.files?.[0] ?? undefined)
-                    }
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
+              render={({ field, fieldState }) => {
+                if (!showImageField) {
+                  return (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-fit"
+                      onClick={() => {
+                        setShowImageField(true);
+                        // Small delay to let the input render before clicking it
+                        setTimeout(() => fileInputRef.current?.click(), 0);
+                      }}
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                      Add image
+                    </Button>
+                  );
+                }
+
+                return (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="post-image">Image</FieldLabel>
+                    <div className="relative">
+                      <input
+                        ref={fileInputRef}
+                        id="post-image"
+                        type="file"
+                        accept="image/*"
+                        className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 file:bg-primary file:text-primary-foreground flex w-full rounded-lg border bg-transparent px-2.5 py-2 pr-10 text-sm file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2"
+                        onChange={(e) =>
+                          field.onChange(e.target.files?.[0] ?? undefined)
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="absolute top-1/2 right-1.5 -translate-y-1/2"
+                        onClick={() => {
+                          field.onChange(undefined);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                          setShowImageField(false);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                        <span className="sr-only">Clear image</span>
+                      </Button>
+                    </div>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                );
+              }}
             />
           </FieldGroup>
         </form>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="gap-2">
         <Button
           type="submit"
           form="create-post-form"
           disabled={form.formState.isSubmitting}
+          className="min-w-28"
         >
           {form.formState.isSubmitting ? "Posting..." : "Post"}
         </Button>
+        {onSuccess && (
+          <Button type="button" variant="outline" onClick={onSuccess}>
+            Cancel
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );

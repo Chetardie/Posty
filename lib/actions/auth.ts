@@ -9,11 +9,11 @@ export type ActionResult =
   | { success: true }
   | { success: false; error: string };
 
-export async function loginAction(
-  data: LoginFormValues
-): Promise<ActionResult> {
-  const parsed = loginSchema.safeParse(data);
-  console.log(parsed);
+export async function loginAction(data: FormData): Promise<ActionResult> {
+  const email = data.get("email");
+  const password = data.get("password");
+  const parsed = loginSchema.safeParse({ email, password });
+
   if (!parsed.success) {
     return {
       success: false,
@@ -28,10 +28,11 @@ export async function loginAction(
   redirect("/");
 }
 
-export async function signupAction(
-  data: SignupFormValues
-): Promise<ActionResult> {
-  const parsed = signupSchema.safeParse(data);
+export async function signupAction(data: FormData): Promise<ActionResult> {
+  const email = data.get("email");
+  const password = data.get("password");
+  const confirmPassword = data.get("confirmPassword");
+  const parsed = signupSchema.safeParse({ email, password, confirmPassword });
   if (!parsed.success) {
     return {
       success: false,
