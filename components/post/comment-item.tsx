@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { formatDistanceToNow } from "date-fns";
 import { Heart, MessageCircle, Pencil, Trash2, X, Check } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,49 +12,65 @@ import {
   getRepliesAction,
   deleteCommentAction,
   updateCommentAction,
+  toggleCommentLikeAction,
 } from "@/lib/actions/comment";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export function CommentItem({ comment }: { comment: CommentType }) {
+  const queryClient = useQueryClient();
   const [isLiked, setIsLiked] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
   const [showReplyInput, setShowReplyInput] = useState(false);
-  const [replies, setReplies] = useState<CommentType[]>([]);
-  const [isLoadingReplies, setIsLoadingReplies] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
-  const [isPending, setIsPending] = useState(false);
 
-  const fetchReplies = useCallback(async () => {
-    setIsLoadingReplies(true);
-    try {
-      const fetchedReplies = await getRepliesAction(comment.id);
-      setReplies(fetchedReplies);
-    } catch (err) {
-      console.error("Failed to load replies:", err);
-    } finally {
-      setIsLoadingReplies(false);
-    }
-  }, [comment.id]);
+  const {
+    data: replies = [],
+    isLoading: isLoadingReplies,
+    refetch: fetchReplies,
+  } = useQuery({
+    queryKey: ["replies", comment.id],
+    queryFn: () => getRepliesAction(comment.id),
+    enabled: showReplies,
+  });
 
   const handleToggleReplies = () => {
-    if (!showReplies) {
-      setShowReplies(true);
-      fetchReplies();
-    } else {
-      setShowReplies(false);
-    }
+    setShowReplies(!showReplies);
   };
+
+  const updateMutation = useMutation({
+    mutationFn: (formData: FormData) => updateCommentAction(formData),
+    onSuccess: (result) => {
+      if (result.success) {
+        setIsEditing(false);
+        queryClient.invalidateQueries({
+          queryKey: ["comments", comment.postId],
+        });
+        queryClient.invalidateQueries({ queryKey: ["replies", comment.id] });
+      } else {
+        alert(result.error);
+      }
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteCommentAction(comment.id),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({
+          queryKey: ["comments", comment.postId],
+        });
+        queryClient.invalidateQueries({ queryKey: ["replies"] });
+      } else {
+        alert(result.error);
+      }
+    },
+  });
 
   const handleDelete = async () => {
     if (confirm("Are you sure you want to delete this comment?")) {
-      setIsPending(true);
-      const result = await deleteCommentAction(comment.id);
-      if (!result.success) {
-        alert(result.error);
-      }
-      setIsPending(false);
+      deleteMutation.mutate();
     }
   };
 
@@ -60,19 +78,29 @@ export function CommentItem({ comment }: { comment: CommentType }) {
     e.preventDefault();
     if (!editContent.trim()) return;
 
-    setIsPending(true);
     const formData = new FormData();
     formData.append("id", comment.id);
     formData.append("content", editContent);
 
-    const result = await updateCommentAction(formData);
-    if (result.success) {
-      setIsEditing(false);
-    } else {
-      alert(result.error);
-    }
-    setIsPending(false);
+    updateMutation.mutate(formData);
   };
+
+  const likeMutation = useMutation({
+    mutationFn: () => toggleCommentLikeAction(comment.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["comments", comment.postId] });
+      queryClient.invalidateQueries({ queryKey: ["replies", comment.id] });
+    },
+  });
+
+  const handleLike = () => {
+    likeMutation.mutate();
+  };
+
+  const isPending =
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    likeMutation.isPending;
 
   return (
     <div className="flex flex-col">
@@ -144,15 +172,18 @@ export function CommentItem({ comment }: { comment: CommentType }) {
             </button>
 
             <button
-              className={`group flex items-center gap-1.5 transition-colors outline-none ${isLiked ? "text-pink-600" : "hover:text-pink-600"}`}
-              onClick={() => setIsLiked(!isLiked)}
+              className={`group flex items-center gap-1.5 transition-colors outline-none ${comment.isLiked ? "text-pink-600" : "hover:text-pink-600"}`}
+              onClick={handleLike}
+              disabled={likeMutation.isPending}
             >
               <div
-                className={`-ml-1.5 rounded-full p-1.5 transition-colors ${isLiked ? "" : "group-hover:bg-pink-600/10"}`}
+                className={`-ml-1.5 rounded-full p-1.5 transition-colors ${comment.isLiked ? "" : "group-hover:bg-pink-600/10"}`}
               >
-                <Heart className={`size-4 ${isLiked ? "fill-current" : ""}`} />
+                <Heart
+                  className={`size-4 ${comment.isLiked ? "fill-current" : ""}`}
+                />
               </div>
-              <span>{comment.likesCount + (isLiked ? 1 : 0)}</span>
+              <span>{comment.likesCount}</span>
             </button>
 
             <button

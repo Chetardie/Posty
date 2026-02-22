@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+
 import { CommentItem } from "./comment-item";
 import { getCommentsAction } from "@/lib/actions/comment";
 
@@ -16,24 +17,15 @@ export type CommentType = {
   };
   likesCount: number;
   repliesCount: number;
+  isLiked: boolean;
   isOwner?: boolean;
 };
 
 export function PostComments({ postId }: { postId: string }) {
-  const [comments, setComments] = useState<CommentType[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    getCommentsAction(postId)
-      .then((data) => {
-        setComments(data);
-        setIsLoading(false);
-      })
-      .catch((error) => {
-        console.error("Failed to load comments:", error);
-        setIsLoading(false);
-      });
-  }, [postId]);
+  const { data: comments, isLoading } = useQuery({
+    queryKey: ["comments", postId],
+    queryFn: () => getCommentsAction(postId),
+  });
 
   if (isLoading) {
     return (
@@ -49,7 +41,7 @@ export function PostComments({ postId }: { postId: string }) {
     );
   }
 
-  if (comments.length === 0) {
+  if (!comments || comments.length === 0) {
     return (
       <div className="text-muted-foreground border-t py-6 text-center text-sm">
         No comments yet. Be the first to share your thoughts!

@@ -10,8 +10,9 @@ import {
   Check,
   ImagePlus,
 } from "lucide-react";
-import { useState, useTransition, useOptimistic, useRef } from "react";
+import { useState, useRef } from "react";
 import Image from "next/image";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { PostComments } from "./post-comments";
 import { CommentInput } from "./comment-input";
@@ -43,10 +44,11 @@ export function PostCard({
   authorName,
   createdAt,
   commentCount,
-  likeCount: initialLikeCount,
-  isLiked: initialIsLiked,
+  likeCount,
+  isLiked,
   isOwner = false,
 }: PostCardProps) {
+  const queryClient = useQueryClient();
   const [showComments, setShowComments] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -56,28 +58,43 @@ export function PostCard({
   const [shouldRemoveImage, setShouldRemoveImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [isPending, startTransition] = useTransition();
+  const likeMutation = useMutation({
+    mutationFn: () => togglePostLikeAction(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
+  });
 
-  const [optimisticLike, addOptimisticLike] = useOptimistic(
-    { isLiked: initialIsLiked, likeCount: initialLikeCount },
-    (state, newIsLiked: boolean) => ({
-      isLiked: newIsLiked,
-      likeCount: state.likeCount + (newIsLiked ? 1 : -1),
-    })
-  );
+  const deleteMutation = useMutation({
+    mutationFn: () => deletePostAction(id),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ["posts"] });
+      } else {
+        alert(result.error);
+      }
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (formData: FormData) => updatePostAction(formData),
+    onSuccess: (result) => {
+      if (result.success) {
+        setIsEditing(false);
+        queryClient.invalidateQueries({ queryKey: ["posts"] });
+      } else {
+        alert(result.error);
+      }
+    },
+  });
 
   const handleLike = () => {
-    startTransition(async () => {
-      addOptimisticLike(!optimisticLike.isLiked);
-      await togglePostLikeAction(id);
-    });
+    likeMutation.mutate();
   };
 
   const handleDelete = () => {
     if (confirm("Are you sure you want to delete this post?")) {
-      startTransition(async () => {
-        await deletePostAction(id);
-      });
+      deleteMutation.mutate();
     }
   };
 
@@ -100,24 +117,17 @@ export function PostCard({
   const handleUpdate = async () => {
     if (!editContent.trim()) return;
 
-    startTransition(async () => {
-      const formData = new FormData();
-      formData.append("id", id);
-      formData.append("content", editContent);
-      if (editImage) {
-        formData.append("image", editImage);
-      }
-      if (shouldRemoveImage) {
-        formData.append("removeImage", "true");
-      }
+    const formData = new FormData();
+    formData.append("id", id);
+    formData.append("content", editContent);
+    if (editImage) {
+      formData.append("image", editImage);
+    }
+    if (shouldRemoveImage) {
+      formData.append("removeImage", "true");
+    }
 
-      const result = await updatePostAction(formData);
-      if (result.success) {
-        setIsEditing(false);
-      } else {
-        alert(result.error);
-      }
-    });
+    updateMutation.mutate(formData);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,6 +151,11 @@ export function PostCard({
       fileInputRef.current.value = "";
     }
   };
+
+  const isPending =
+    likeMutation.isPending ||
+    deleteMutation.isPending ||
+    updateMutation.isPending;
 
   return (
     <Card className="w-full">
@@ -283,17 +298,16 @@ export function PostCard({
           disabled={isPending || isEditing}
           className={cn(
             "group flex items-center gap-1.5 transition-colors outline-none",
-            optimisticLike.isLiked ? "text-red-500" : "hover:text-red-500",
+            isLiked ? "text-red-500" : "hover:text-red-500",
             isEditing && "cursor-not-allowed opacity-50"
           )}
         >
           <div className="-ml-1.5 rounded-full p-1.5 transition-colors group-hover:bg-red-500/10">
-            <Heart
-              className={cn("size-4", optimisticLike.isLiked && "fill-current")}
-            />
+            <Heart className={cn("size-4", isLiked && "fill-current")} />
           </div>
-          {optimisticLike.likeCount}
+          {likeCount}
         </button>
+
         <button
           onClick={() => setShowComments(!showComments)}
           disabled={isEditing}

@@ -1,6 +1,8 @@
 "use client";
 
-import { useRef, useActionState, useEffect } from "react";
+import { useRef } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { Input } from "@/components/ui/input";
 import { SendHorizontal } from "lucide-react";
 import { createCommentAction } from "@/lib/actions/comment";
@@ -30,24 +32,34 @@ export function CommentInput({
   parentId,
   onSuccess,
 }: CommentInputProps) {
+  const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, action] = useActionState(
-    async (_state: unknown, formData: FormData) =>
-      createCommentAction(formData),
-    undefined
-  );
 
-  useEffect(() => {
-    if (state?.success) {
-      formRef.current?.reset();
-      onSuccess?.();
-    }
-  }, [state, onSuccess]);
+  const mutation = useMutation({
+    mutationFn: (formData: FormData) => createCommentAction(formData),
+    onSuccess: (result) => {
+      if (result.success) {
+        formRef.current?.reset();
+        onSuccess?.();
+        if (parentId) {
+          queryClient.invalidateQueries({ queryKey: ["replies", parentId] });
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["comments", postId] });
+        }
+      } else {
+        alert(result.error);
+      }
+    },
+  });
+
+  const handleAction = async (formData: FormData) => {
+    mutation.mutate(formData);
+  };
 
   return (
     <form
       ref={formRef}
-      action={action}
+      action={handleAction}
       className="flex items-center gap-2 border-t p-4"
     >
       <input type="hidden" name="postId" value={postId} />

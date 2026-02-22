@@ -27,7 +27,10 @@ interface CreatePostFormProps {
   onSuccess?: () => void;
 }
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
 export function CreatePostForm({ onSuccess }: CreatePostFormProps) {
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showImageField, setShowImageField] = useState(false);
 
@@ -39,24 +42,30 @@ export function CreatePostForm({ onSuccess }: CreatePostFormProps) {
     },
   });
 
+  const mutation = useMutation({
+    mutationFn: (formData: FormData) => createPostAction(formData),
+    onSuccess: (result) => {
+      if (result.success) {
+        form.reset();
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        setShowImageField(false);
+        queryClient.invalidateQueries({ queryKey: ["posts"] });
+        onSuccess?.();
+      } else {
+        form.setError("root", { message: result.error });
+      }
+    },
+  });
+
   async function handleSubmit(data: CreatePostFormValues) {
-    form.clearErrors("root");
     const formData = new FormData();
     formData.append("content", data.content);
     if (data.image) {
       formData.append("image", data.image);
     }
-    const result = await createPostAction(formData);
-    if (!result.success) {
-      form.setError("root", { message: result.error });
-      return;
-    }
-    form.reset();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-    setShowImageField(false);
-    onSuccess?.();
+    mutation.mutate(formData);
   }
 
   return (
@@ -159,10 +168,10 @@ export function CreatePostForm({ onSuccess }: CreatePostFormProps) {
         <Button
           type="submit"
           form="create-post-form"
-          disabled={form.formState.isSubmitting}
+          disabled={mutation.isPending}
           className="min-w-28"
         >
-          {form.formState.isSubmitting ? "Posting..." : "Post"}
+          {mutation.isPending ? "Posting..." : "Post"}
         </Button>
         {onSuccess && (
           <Button type="button" variant="outline" onClick={onSuccess}>
