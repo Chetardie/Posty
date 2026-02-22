@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { createPostSchema, updatePostSchema } from "@/lib/validations/post";
 import { getCurrentUser } from "./auth";

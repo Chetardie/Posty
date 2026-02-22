@@ -15,11 +15,9 @@ import {
   toggleCommentLikeAction,
 } from "@/lib/actions/comment";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 
 export function CommentItem({ comment }: { comment: CommentType }) {
   const queryClient = useQueryClient();
-  const [isLiked, setIsLiked] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [isEditing, setIsEditing] = useState(false);

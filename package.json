@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently -n \"NEXT,LINT\" -c \"cyan,magenta\" --kill-others \"next dev\" \"npm run lint:watch\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "lint:watch": "chokidar \"**/*.{js,jsx,ts,tsx}\" -i \"node_modules|.next\" -c \"npm run lint\"",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -38,6 +39,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "eslint-config-prettier": "^10.1.8",
