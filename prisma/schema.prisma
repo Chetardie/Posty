@@ -8,16 +8,32 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model User {
+  id           String        @id @db.Uuid
+  posts        Post[]
+  comments     Comment[]
+  postLikes    PostLike[]
+  commentLikes CommentLike[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Post {
   id        String    @id @default(cuid())
   content   String
   imageUrl  String?
   authorId  String?   @db.Uuid
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
-  comments  Comment[]
+
+  author   User?      @relation(fields: [authorId], references: [id])
+  comments Comment[]
+  likes    PostLike[]
 
   @@index([createdAt])
+  @@index([authorId])
 }
 
 model Comment {
@@ -28,12 +44,48 @@ model Comment {
   imageUrl  String?
   authorId  String?   @db.Uuid
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  post    Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  parent  Comment? @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies Comment[] @relation("Replies")
+  post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent  Comment?      @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[]     @relation("Replies")
+  author  User?         @relation(fields: [authorId], references: [id])
+  likes   CommentLike[]
 
   @@index([postId])
   @@index([parentId])
+  @@index([authorId])
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String?  @db.Uuid
+  guestId   String?
+  createdAt DateTime @default(now())
+
+  post Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@unique([postId, guestId])
+  @@index([userId])
+  @@index([guestId])
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String?  @db.Uuid
+  guestId   String?
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@unique([commentId, guestId])
+  @@index([userId])
+  @@index([guestId])
 }

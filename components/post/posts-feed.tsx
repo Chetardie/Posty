@@ -6,9 +6,7 @@ export async function PostsFeed() {
 
   if (posts.length === 0) {
     return (
-      <p className="text-center text-muted-foreground py-8">
-        No posts yet
-      </p>
+      <p className="text-muted-foreground py-8 text-center">No posts yet</p>
     );
   }
 
@@ -22,6 +20,8 @@ export async function PostsFeed() {
           imageUrl={post.imageUrl}
           createdAt={post.createdAt}
           commentCount={post.commentCount}
+          likeCount={post.likeCount}
+          isLiked={post.isLiked}
         />
       ))}
     </div>

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { createPostSchema, updatePostSchema } from "@/lib/validations/post";
@@ -85,14 +86,25 @@ export type PostFeedItem = {
   authorId: string | null;
   createdAt: string;
   commentCount: number;
+  likeCount: number;
+  isLiked: boolean;
 };
 
 export async function getPostsAction(): Promise<PostFeedItem[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const cookieStore = await cookies();
+  const guestId = cookieStore.get("guestId")?.value;
+
   const posts = await db.post.findMany({
     where: { deletedAt: null },
     orderBy: { createdAt: "desc" },
     include: {
       comments: { where: { deletedAt: null }, select: { id: true } },
+      likes: { select: { userId: true, guestId: true } },
     },
   });
 
@@ -103,6 +115,12 @@ export async function getPostsAction(): Promise<PostFeedItem[]> {
     authorId: post.authorId,
     createdAt: post.createdAt.toISOString(),
     commentCount: post.comments.length,
+    likeCount: post.likes.length,
+    isLiked: post.likes.some(
+      (like) =>
+        (user && like.userId === user.id) ||
+        (guestId && like.guestId === guestId)
+    ),
   }));
 }
 
@@ -209,4 +227,59 @@ export async function deletePostAction(id: string): Promise<ActionResult> {
 
   revalidatePath("/");
   return { success: true };
+}
+
+export async function togglePostLikeAction(
+  postId: string
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const cookieStore = await cookies();
+  let guestId = cookieStore.get("guestId")?.value;
+
+  if (!user && !guestId) {
+    guestId = crypto.randomUUID();
+    cookieStore.set("guestId", guestId, {
+      path: "/",
+      httpOnly: true,
+      maxAge: 60 * 60 * 24 * 365, // 1 year
+    });
+  }
+
+  const userId = user?.id;
+
+  try {
+    const existingLike = await db.postLike.findFirst({
+      where: {
+        postId,
+        OR: [
+          ...(userId ? [{ userId }] : []),
+          ...(guestId ? [{ guestId }] : []),
+        ],
+      },
+    });
+
+    if (existingLike) {
+      await db.postLike.delete({
+        where: { id: existingLike.id },
+      });
+    } else {
+      await db.postLike.create({
+        data: {
+          postId,
+          userId: userId ?? null,
+          guestId: userId ? null : (guestId ?? null),
+        },
+      });
+    }
+
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    console.error("Toggle like error:", error);
+    return { success: false, error: "Failed to toggle like" };
+  }
 }
