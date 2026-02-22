@@ -10,63 +10,65 @@ datasource db {
 
 model User {
   id           String        @id @db.Uuid
-  posts        Post[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  name         String
+  email        String        @unique
   comments     Comment[]
-  postLikes    PostLike[]
   commentLikes CommentLike[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  posts        Post[]
+  postLikes    PostLike[]
 }
 
 model Post {
-  id        String    @id @default(cuid())
+  id        String     @id @default(cuid())
   content   String
   imageUrl  String?
-  authorId  String?   @db.Uuid
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  authorId  String?    @db.Uuid
+  guestId   String?
+  createdAt DateTime   @default(now())
   deletedAt DateTime?
-
-  author   User?      @relation(fields: [authorId], references: [id])
-  comments Comment[]
-  likes    PostLike[]
+  updatedAt DateTime   @updatedAt
+  comments  Comment[]
+  author    User?      @relation(fields: [authorId], references: [id])
+  likes     PostLike[]
 
   @@index([createdAt])
   @@index([authorId])
+  @@index([guestId])
 }
 
 model Comment {
-  id        String    @id @default(cuid())
+  id        String        @id @default(cuid())
   postId    String
   parentId  String?
   content   String
   imageUrl  String?
-  authorId  String?   @db.Uuid
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  authorId  String?       @db.Uuid
+  guestId   String?
+  createdAt DateTime      @default(now())
   deletedAt DateTime?
-
-  post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
-  parent  Comment?      @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies Comment[]     @relation("Replies")
-  author  User?         @relation(fields: [authorId], references: [id])
-  likes   CommentLike[]
+  updatedAt DateTime      @updatedAt
+  author    User?         @relation(fields: [authorId], references: [id])
+  parent    Comment?      @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[]     @relation("Replies")
+  post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  likes     CommentLike[]
 
   @@index([postId])
   @@index([parentId])
   @@index([authorId])
+  @@index([guestId])
 }
 
 model PostLike {
   id        String   @id @default(cuid())
   postId    String
   userId    String?  @db.Uuid
-  guestId   String?
   createdAt DateTime @default(now())
-
-  post Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestId   String?
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
   @@unique([postId, guestId])
@@ -78,11 +80,10 @@ model CommentLike {
   id        String   @id @default(cuid())
   commentId String
   userId    String?  @db.Uuid
-  guestId   String?
   createdAt DateTime @default(now())
-
-  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestId   String?
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([commentId, userId])
   @@unique([commentId, guestId])

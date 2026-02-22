@@ -27,6 +27,7 @@ export function SignupForm() {
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
+      name: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -36,6 +37,7 @@ export function SignupForm() {
   async function handleSubmit(data: SignupFormValues) {
     form.clearErrors("root");
     const formData = new FormData();
+    formData.append("name", data.name);
     formData.append("email", data.email);
     formData.append("password", data.password);
     formData.append("confirmPassword", data.confirmPassword);
@@ -61,6 +63,26 @@ export function SignupForm() {
             />
           )}
           <FieldGroup>
+            <Controller
+              name="name"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="signup-name">Name</FieldLabel>
+                  <Input
+                    {...field}
+                    id="signup-name"
+                    type="text"
+                    autoComplete="name"
+                    aria-invalid={fieldState.invalid}
+                    placeholder=""
+                  />
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
             <Controller
               name="email"
               control={form.control}

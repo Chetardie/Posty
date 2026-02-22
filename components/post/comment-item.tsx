@@ -2,11 +2,17 @@
 
 import { useState, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Heart, MessageCircle } from "lucide-react";
+import { Heart, MessageCircle, Pencil, Trash2, X, Check } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { type CommentType } from "./post-comments";
 import { CommentInput } from "./comment-input";
-import { getRepliesAction } from "@/lib/actions/comment";
+import {
+  getRepliesAction,
+  deleteCommentAction,
+  updateCommentAction,
+} from "@/lib/actions/comment";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 export function CommentItem({ comment }: { comment: CommentType }) {
   const [isLiked, setIsLiked] = useState(false);
@@ -14,6 +20,9 @@ export function CommentItem({ comment }: { comment: CommentType }) {
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replies, setReplies] = useState<CommentType[]>([]);
   const [isLoadingReplies, setIsLoadingReplies] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(comment.content);
+  const [isPending, setIsPending] = useState(false);
 
   const fetchReplies = useCallback(async () => {
     setIsLoadingReplies(true);
@@ -34,6 +43,35 @@ export function CommentItem({ comment }: { comment: CommentType }) {
     } else {
       setShowReplies(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (confirm("Are you sure you want to delete this comment?")) {
+      setIsPending(true);
+      const result = await deleteCommentAction(comment.id);
+      if (!result.success) {
+        alert(result.error);
+      }
+      setIsPending(false);
+    }
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editContent.trim()) return;
+
+    setIsPending(true);
+    const formData = new FormData();
+    formData.append("id", comment.id);
+    formData.append("content", editContent);
+
+    const result = await updateCommentAction(formData);
+    if (result.success) {
+      setIsEditing(false);
+    } else {
+      alert(result.error);
+    }
+    setIsPending(false);
   };
 
   return (
@@ -60,9 +98,39 @@ export function CommentItem({ comment }: { comment: CommentType }) {
             </span>
           </div>
 
-          <p className="text-sm wrap-break-word whitespace-pre-wrap">
-            {comment.content}
-          </p>
+          {isEditing ? (
+            <form onSubmit={handleUpdate} className="mt-1 flex flex-col gap-2">
+              <Input
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                autoFocus
+                className="bg-muted/50 text-sm"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="flex items-center gap-1 rounded-full bg-blue-500 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+                >
+                  <Check className="size-3" /> Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditContent(comment.content);
+                  }}
+                  className="bg-muted text-foreground hover:bg-muted/80 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
+                >
+                  <X className="size-3" /> Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <p className="text-sm wrap-break-word whitespace-pre-wrap">
+              {comment.content}
+            </p>
+          )}
 
           <div className="text-muted-foreground mt-2 flex items-center gap-6 text-xs">
             <button
@@ -93,6 +161,26 @@ export function CommentItem({ comment }: { comment: CommentType }) {
             >
               Reply
             </button>
+
+            {comment.isOwner && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="p-1 transition-colors hover:text-blue-500"
+                  title="Edit comment"
+                >
+                  <Pencil className="size-3.5" />
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isPending}
+                  className="p-1 transition-colors hover:text-red-500"
+                  title="Delete comment"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

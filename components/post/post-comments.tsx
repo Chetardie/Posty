@@ -16,6 +16,7 @@ export type CommentType = {
   };
   likesCount: number;
   repliesCount: number;
+  isOwner?: boolean;
 };
 
 export function PostComments({ postId }: { postId: string }) {

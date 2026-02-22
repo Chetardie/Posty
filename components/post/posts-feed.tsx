@@ -18,10 +18,12 @@ export async function PostsFeed() {
           id={post.id}
           content={post.content}
           imageUrl={post.imageUrl}
+          authorName={post.authorName}
           createdAt={post.createdAt}
           commentCount={post.commentCount}
           likeCount={post.likeCount}
           isLiked={post.isLiked}
+          isOwner={post.isOwner}
         />
       ))}
     </div>

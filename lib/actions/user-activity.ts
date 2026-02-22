@@ -19,8 +19,9 @@ export async function getUserPostsAction(
     },
     orderBy: { createdAt: "desc" },
     include: {
+      author: { select: { name: true } },
       comments: { where: { deletedAt: null }, select: { id: true } },
-      likes: { select: { userId: true } },
+      likes: { select: { userId: true, guestId: true } },
     },
   });
 
@@ -29,6 +30,7 @@ export async function getUserPostsAction(
     content: post.content,
     imageUrl: post.imageUrl,
     authorId: post.authorId,
+    authorName: post.author?.name || "Anonymous",
     createdAt: post.createdAt.toISOString(),
     commentCount: post.comments.length,
     likeCount: post.likes.length,
@@ -49,8 +51,9 @@ export async function getUserLikedPostsAction(
     include: {
       post: {
         include: {
+          author: { select: { name: true } },
           comments: { where: { deletedAt: null }, select: { id: true } },
-          likes: { select: { userId: true } },
+          likes: { select: { userId: true, guestId: true } },
         },
       },
     },
@@ -62,6 +65,7 @@ export async function getUserLikedPostsAction(
     content: like.post.content,
     imageUrl: like.post.imageUrl,
     authorId: like.post.authorId,
+    authorName: like.post.author?.name || "Anonymous",
     createdAt: like.post.createdAt.toISOString(),
     commentCount: like.post.comments.length,
     likeCount: like.post.likes.length,

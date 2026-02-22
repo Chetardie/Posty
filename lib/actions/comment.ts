@@ -8,6 +8,7 @@ import {
   createCommentSchema,
   updateCommentSchema,
 } from "@/lib/validations/comment";
+import { getCurrentUser } from "./auth";
 
 const BUCKET = "comment-images";
 
@@ -65,10 +66,9 @@ export async function createCommentAction(
     imageUrl = url;
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
+  const cookieStore = await cookies();
+  const guestId = cookieStore.get("guestId")?.value;
 
   try {
     await db.comment.create({
@@ -78,10 +78,11 @@ export async function createCommentAction(
         parentId: parsed.data.parentId,
         imageUrl,
         authorId: user?.id ?? null,
+        guestId: user ? null : (guestId ?? null),
       },
     });
   } catch (err) {
-    console.error(err);
+    console.error("Create comment error:", err);
     return { success: false, error: "Failed to create comment" };
   }
 
@@ -92,15 +93,6 @@ export async function createCommentAction(
 export async function updateCommentAction(
   formData: FormData
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authenticated user required" };
-  }
-
   const id = formData.get("id");
   const content = formData.get("content");
 
@@ -124,7 +116,15 @@ export async function updateCommentAction(
     return { success: false, error: "Comment not found" };
   }
 
-  if (comment.authorId !== user.id) {
+  const user = await getCurrentUser();
+  const cookieStore = await cookies();
+  const guestId = cookieStore.get("guestId")?.value;
+
+  const isOwner =
+    (user && comment.authorId === user.id) ||
+    (!user && guestId && comment.guestId === guestId);
+
+  if (!isOwner) {
     return { success: false, error: "Unauthorized: You are not the author" };
   }
 
@@ -144,15 +144,6 @@ export async function updateCommentAction(
 }
 
 export async function deleteCommentAction(id: string): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authenticated user required" };
-  }
-
   const comment = await db.comment.findUnique({
     where: { id },
   });
@@ -161,7 +152,15 @@ export async function deleteCommentAction(id: string): Promise<ActionResult> {
     return { success: false, error: "Comment not found" };
   }
 
-  if (comment.authorId !== user.id) {
+  const user = await getCurrentUser();
+  const cookieStore = await cookies();
+  const guestId = cookieStore.get("guestId")?.value;
+
+  const isOwner =
+    (user && comment.authorId === user.id) ||
+    (!user && guestId && comment.guestId === guestId);
+
+  if (!isOwner) {
     return { success: false, error: "Unauthorized: You are not the author" };
   }
 
@@ -183,10 +182,7 @@ export async function deleteCommentAction(id: string): Promise<ActionResult> {
 export async function toggleCommentLikeAction(
   commentId: string
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   const cookieStore = await cookies();
   let guestId = cookieStore.get("guestId")?.value;
@@ -236,11 +232,7 @@ export async function toggleCommentLikeAction(
 }
 
 export async function getCommentsAction(postId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getCurrentUser();
   const cookieStore = await cookies();
   const guestId = cookieStore.get("guestId")?.value;
 
@@ -248,6 +240,7 @@ export async function getCommentsAction(postId: string) {
     where: { postId, parentId: null, deletedAt: null },
     orderBy: { createdAt: "desc" },
     include: {
+      author: { select: { name: true } },
       likes: { select: { userId: true, guestId: true } },
       replies: { where: { deletedAt: null }, select: { id: true } },
     },
@@ -259,8 +252,9 @@ export async function getCommentsAction(postId: string) {
     content: comment.content,
     createdAt: comment.createdAt.toISOString(),
     author: {
-      name: "Anonymous",
-      username: "anonymous",
+      name: comment.author?.name || "Anonymous",
+      username:
+        comment.author?.name?.toLowerCase().replace(/\s+/g, "_") || "anonymous",
     },
     likesCount: comment.likes.length,
     repliesCount: comment.replies.length,
@@ -269,15 +263,16 @@ export async function getCommentsAction(postId: string) {
         (user && like.userId === user.id) ||
         (guestId && like.guestId === guestId)
     ),
+    isOwner:
+      (user && comment.authorId === user.id) ||
+      (!user && guestId && comment.guestId === guestId)
+        ? true
+        : false,
   }));
 }
 
 export async function getRepliesAction(parentId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await getCurrentUser();
   const cookieStore = await cookies();
   const guestId = cookieStore.get("guestId")?.value;
 
@@ -285,6 +280,7 @@ export async function getRepliesAction(parentId: string) {
     where: { parentId, deletedAt: null },
     orderBy: { createdAt: "asc" },
     include: {
+      author: { select: { name: true } },
       likes: { select: { userId: true, guestId: true } },
       replies: { where: { deletedAt: null }, select: { id: true } },
     },
@@ -296,8 +292,9 @@ export async function getRepliesAction(parentId: string) {
     content: comment.content,
     createdAt: comment.createdAt.toISOString(),
     author: {
-      name: "Anonymous",
-      username: "anonymous",
+      name: comment.author?.name || "Anonymous",
+      username:
+        comment.author?.name?.toLowerCase().replace(/\s+/g, "_") || "anonymous",
     },
     likesCount: comment.likes.length,
     repliesCount: comment.replies.length,
@@ -306,5 +303,10 @@ export async function getRepliesAction(parentId: string) {
         (user && like.userId === user.id) ||
         (guestId && like.guestId === guestId)
     ),
+    isOwner:
+      (user && comment.authorId === user.id) ||
+      (!user && guestId && comment.guestId === guestId)
+        ? true
+        : false,
   }));
 }

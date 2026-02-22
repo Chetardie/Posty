@@ -25,6 +25,7 @@ export const updatePostSchema = z.object({
     .min(1, "Content is required")
     .max(2000, "Max 2000 characters"),
   image: z.instanceof(File).optional(),
+  removeImage: z.boolean().optional(),
 });
 
 export type UpdatePostFormValues = z.infer<typeof updatePostSchema>;

@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { createPostSchema, updatePostSchema } from "@/lib/validations/post";
+import { getCurrentUser } from "./auth";
 
 const BUCKET = "post-images";
 
@@ -58,10 +59,9 @@ export async function createPostAction(
     imageUrl = url;
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
+  const cookieStore = await cookies();
+  const guestId = cookieStore.get("guestId")?.value;
 
   try {
     await db.post.create({
@@ -69,9 +69,11 @@ export async function createPostAction(
         content: parsed.data.content,
         imageUrl,
         authorId: user?.id ?? null,
+        guestId: user ? null : (guestId ?? null),
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("Create post error:", error);
     return { success: false, error: "Failed to create post" };
   }
 
@@ -83,18 +85,18 @@ export type PostFeedItem = {
   id: string;
   content: string;
   imageUrl: string | null;
-  authorId: string | null;
+  authorName: string;
   createdAt: string;
   commentCount: number;
   likeCount: number;
   isLiked: boolean;
+  authorId: string | null;
+  guestId: string | null;
+  isOwner: boolean;
 };
 
 export async function getPostsAction(): Promise<PostFeedItem[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   const cookieStore = await cookies();
   const guestId = cookieStore.get("guestId")?.value;
@@ -103,6 +105,7 @@ export async function getPostsAction(): Promise<PostFeedItem[]> {
     where: { deletedAt: null },
     orderBy: { createdAt: "desc" },
     include: {
+      author: { select: { name: true } },
       comments: { where: { deletedAt: null }, select: { id: true } },
       likes: { select: { userId: true, guestId: true } },
     },
@@ -112,7 +115,7 @@ export async function getPostsAction(): Promise<PostFeedItem[]> {
     id: post.id,
     content: post.content,
     imageUrl: post.imageUrl,
-    authorId: post.authorId,
+    authorName: post.author?.name || "Anonymous",
     createdAt: post.createdAt.toISOString(),
     commentCount: post.comments.length,
     likeCount: post.likes.length,
@@ -121,30 +124,34 @@ export async function getPostsAction(): Promise<PostFeedItem[]> {
         (user && like.userId === user.id) ||
         (guestId && like.guestId === guestId)
     ),
+    authorId: post.authorId,
+    guestId: post.guestId,
+    isOwner:
+      (user && post.authorId === user.id) ||
+      (!user && guestId && post.guestId === guestId)
+        ? true
+        : false,
   }));
 }
 
 export async function updatePostAction(
   formData: FormData
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authenticated user required" };
-  }
+  const user = await getCurrentUser();
+  const cookieStore = await cookies();
+  const guestId = cookieStore.get("guestId")?.value;
 
   const id = formData.get("id");
   const content = formData.get("content");
   const imageFile = formData.get("image");
+  const removeImage = formData.get("removeImage") === "true";
 
   const parsed = updatePostSchema.safeParse({
     id: typeof id === "string" ? id : "",
     content: typeof content === "string" ? content : "",
     image:
       imageFile instanceof File && imageFile.size > 0 ? imageFile : undefined,
+    removeImage,
   });
 
   if (!parsed.success) {
@@ -163,11 +170,20 @@ export async function updatePostAction(
     return { success: false, error: "Post not found" };
   }
 
-  if (post.authorId !== user.id) {
+  const isOwner =
+    (user && post.authorId === user.id) ||
+    (!user && guestId && post.guestId === guestId);
+
+  if (!isOwner) {
     return { success: false, error: "Unauthorized: You are not the author" };
   }
 
   let imageUrl = post.imageUrl;
+
+  if (parsed.data.removeImage) {
+    imageUrl = null;
+  }
+
   if (parsed.data.image instanceof File) {
     const url = await uploadPostImage(parsed.data.image);
     if (!url) {
@@ -193,14 +209,9 @@ export async function updatePostAction(
 }
 
 export async function deletePostAction(id: string): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authenticated user required" };
-  }
+  const user = await getCurrentUser();
+  const cookieStore = await cookies();
+  const guestId = cookieStore.get("guestId")?.value;
 
   const post = await db.post.findUnique({
     where: { id },
@@ -210,7 +221,11 @@ export async function deletePostAction(id: string): Promise<ActionResult> {
     return { success: false, error: "Post not found" };
   }
 
-  if (post.authorId !== user.id) {
+  const isOwner =
+    (user && post.authorId === user.id) ||
+    (!user && guestId && post.guestId === guestId);
+
+  if (!isOwner) {
     return { success: false, error: "Unauthorized: You are not the author" };
   }
 
@@ -232,10 +247,7 @@ export async function deletePostAction(id: string): Promise<ActionResult> {
 export async function togglePostLikeAction(
   postId: string
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   const cookieStore = await cookies();
   let guestId = cookieStore.get("guestId")?.value;
