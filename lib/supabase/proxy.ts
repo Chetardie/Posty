@@ -32,7 +32,8 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getClaims();
+  // This will refresh the session if needed
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }

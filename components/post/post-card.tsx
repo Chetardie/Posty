@@ -11,6 +11,7 @@ import {
   ImagePlus,
 } from "lucide-react";
 import { useState, useTransition, useOptimistic, useRef } from "react";
+import Image from "next/image";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { PostComments } from "./post-comments";
 import { CommentInput } from "./comment-input";
@@ -239,15 +240,19 @@ export function PostCard({
               )}
               {previewUrl && (
                 <div className="relative mt-2">
-                  <img
-                    src={previewUrl}
-                    className="max-h-96 w-full rounded-lg object-cover opacity-50"
-                    alt="Preview"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="bg-background/80 rounded-md px-2 py-1 text-xs font-medium">
-                      Preview of new image
-                    </span>
+                  <div className="relative h-96 w-full overflow-hidden rounded-lg">
+                    <Image
+                      src={previewUrl}
+                      fill
+                      className="object-cover opacity-50"
+                      alt="Preview"
+                      unoptimized={previewUrl.startsWith("data:")}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="bg-background/80 rounded-md px-2 py-1 text-xs font-medium">
+                        Preview of new image
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -259,11 +264,15 @@ export function PostCard({
               {content}
             </p>
             {imageUrl && (
-              <img
-                src={imageUrl}
-                className="mt-3 max-h-96 w-full rounded-lg object-cover"
-                alt="Post image"
-              />
+              <div className="relative mt-3 h-[400px] w-full overflow-hidden rounded-lg">
+                <Image
+                  src={imageUrl}
+                  fill
+                  className="object-cover"
+                  alt="Post image"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                />
+              </div>
             )}
           </>
         )}

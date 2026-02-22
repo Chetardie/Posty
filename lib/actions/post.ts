@@ -6,30 +6,14 @@ import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { createPostSchema, updatePostSchema } from "@/lib/validations/post";
 import { getCurrentUser } from "./auth";
+import { uploadImage } from "@/lib/supabase/storage";
+import { tryCatch } from "@/lib/try-catch";
 
 const BUCKET = "post-images";
 
 export type ActionResult =
   | { success: true }
   | { success: false; error: string };
-
-async function uploadPostImage(file: File): Promise<string | null> {
-  const supabase = await createClient();
-  const ext = file.name.split(".").pop() ?? "jpg";
-  const path = `${Date.now()}-${crypto.randomUUID()}.${ext}`;
-
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    contentType: file.type,
-    upsert: false,
-  });
-
-  if (error) return null;
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return publicUrl;
-}
 
 export async function createPostAction(
   formData: FormData
@@ -52,9 +36,9 @@ export async function createPostAction(
 
   let imageUrl: string | null = null;
   if (parsed.data.image instanceof File) {
-    const url = await uploadPostImage(parsed.data.image);
-    if (!url) {
-      return { success: false, error: "Failed to upload image" };
+    const { url, error } = await uploadImage(parsed.data.image, BUCKET);
+    if (error || !url) {
+      return { success: false, error: error ?? "Failed to upload image" };
     }
     imageUrl = url;
   }
@@ -63,17 +47,19 @@ export async function createPostAction(
   const cookieStore = await cookies();
   const guestId = cookieStore.get("guestId")?.value;
 
-  try {
-    await db.post.create({
+  const { error: dbError } = await tryCatch(
+    db.post.create({
       data: {
         content: parsed.data.content,
         imageUrl,
         authorId: user?.id ?? null,
         guestId: user ? null : (guestId ?? null),
       },
-    });
-  } catch (error) {
-    console.error("Create post error:", error);
+    })
+  );
+
+  if (dbError) {
+    console.error("Create post error:", dbError);
     return { success: false, error: "Failed to create post" };
   }
 
@@ -126,11 +112,10 @@ export async function getPostsAction(): Promise<PostFeedItem[]> {
     ),
     authorId: post.authorId,
     guestId: post.guestId,
-    isOwner:
+    isOwner: Boolean(
       (user && post.authorId === user.id) ||
       (!user && guestId && post.guestId === guestId)
-        ? true
-        : false,
+    ),
   }));
 }
 
@@ -185,22 +170,24 @@ export async function updatePostAction(
   }
 
   if (parsed.data.image instanceof File) {
-    const url = await uploadPostImage(parsed.data.image);
-    if (!url) {
-      return { success: false, error: "Failed to upload image" };
+    const { url, error } = await uploadImage(parsed.data.image, BUCKET);
+    if (error || !url) {
+      return { success: false, error: error ?? "Failed to upload image" };
     }
     imageUrl = url;
   }
 
-  try {
-    await db.post.update({
+  const { error: dbUpdateError } = await tryCatch(
+    db.post.update({
       where: { id: parsed.data.id },
       data: {
         content: parsed.data.content,
         imageUrl,
       },
-    });
-  } catch {
+    })
+  );
+
+  if (dbUpdateError) {
     return { success: false, error: "Failed to update post" };
   }
 
@@ -229,14 +216,16 @@ export async function deletePostAction(id: string): Promise<ActionResult> {
     return { success: false, error: "Unauthorized: You are not the author" };
   }
 
-  try {
-    await db.post.update({
+  const { error: dbDeleteError } = await tryCatch(
+    db.post.update({
       where: { id },
       data: {
         deletedAt: new Date(),
       },
-    });
-  } catch {
+    })
+  );
+
+  if (dbDeleteError) {
     return { success: false, error: "Failed to delete post" };
   }
 
@@ -263,8 +252,8 @@ export async function togglePostLikeAction(
 
   const userId = user?.id;
 
-  try {
-    const existingLike = await db.postLike.findFirst({
+  const { data: existingLike, error: findLikeError } = await tryCatch(
+    db.postLike.findFirst({
       where: {
         postId,
         OR: [
@@ -272,26 +261,30 @@ export async function togglePostLikeAction(
           ...(guestId ? [{ guestId }] : []),
         ],
       },
-    });
+    })
+  );
 
-    if (existingLike) {
-      await db.postLike.delete({
-        where: { id: existingLike.id },
-      });
-    } else {
-      await db.postLike.create({
-        data: {
-          postId,
-          userId: userId ?? null,
-          guestId: userId ? null : (guestId ?? null),
-        },
-      });
-    }
+  if (findLikeError) {
+    return { success: false, error: "Failed to fetch like status" };
+  }
 
-    revalidatePath("/");
-    return { success: true };
-  } catch (error) {
-    console.error("Toggle like error:", error);
+  const { error: toggleError } = await tryCatch(
+    existingLike
+      ? db.postLike.delete({ where: { id: existingLike.id } })
+      : db.postLike.create({
+          data: {
+            postId,
+            userId: userId ?? null,
+            guestId: userId ? null : (guestId ?? null),
+          },
+        })
+  );
+
+  if (toggleError) {
+    console.error("Toggle like error:", toggleError);
     return { success: false, error: "Failed to toggle like" };
   }
+
+  revalidatePath("/");
+  return { success: true };
 }
