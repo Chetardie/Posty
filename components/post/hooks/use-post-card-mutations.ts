@@ -1,12 +1,14 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { PostFeedItem } from "@/lib/actions/post";
 import {
   togglePostLikeAction,
   deletePostAction,
   updatePostAction,
 } from "@/lib/actions/post";
+import { updatePostInInfiniteCache } from "../utils/posts-query";
+import type { PostsPage } from "../utils/posts-query";
+import type { InfiniteData } from "@tanstack/react-query";
 
 type UsePostCardMutationsOptions = {
   onUpdateSuccess?: () => void;
@@ -23,25 +25,19 @@ export function usePostCardMutations(
     mutationFn: () => togglePostLikeAction(id),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["posts"] });
-      const previousPosts = queryClient.getQueryData<PostFeedItem[]>(["posts"]);
-      queryClient.setQueryData<PostFeedItem[]>(["posts"], (old) =>
-        old
-          ? old.map((p) =>
-              p.id === id
-                ? {
-                    ...p,
-                    isLiked: !p.isLiked,
-                    likeCount: p.likeCount + (p.isLiked ? -1 : 1),
-                  }
-                : p
-            )
-          : old
+      const previous = queryClient.getQueryData<InfiniteData<PostsPage>>(["posts"]);
+      queryClient.setQueryData<InfiniteData<PostsPage>>(["posts"], (old) =>
+        updatePostInInfiniteCache(old, id, (p) => ({
+          ...p,
+          isLiked: !p.isLiked,
+          likeCount: p.likeCount + (p.isLiked ? -1 : 1),
+        }))
       );
-      return { previousPosts };
+      return { previous };
     },
     onError: (_err, _variables, context) => {
-      if (context?.previousPosts != null) {
-        queryClient.setQueryData(["posts"], context.previousPosts);
+      if (context?.previous != null) {
+        queryClient.setQueryData(["posts"], context.previous);
       }
     },
     onSettled: () => {

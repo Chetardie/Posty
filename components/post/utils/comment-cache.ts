@@ -1,6 +1,8 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { CommentType } from "../post-comments";
-import type { PostFeedItem } from "@/lib/actions/post";
+import { updatePostInInfiniteCache } from "./posts-query";
+import type { PostsPage } from "./posts-query";
+import type { InfiniteData } from "@tanstack/react-query";
 
 export function updateCommentLikeInList(
   list: CommentType[] | undefined,
@@ -88,11 +90,10 @@ export function applyReplySuccessToCache({
       );
     }
   }
-  queryClient.setQueryData<PostFeedItem[]>(["posts"], (old) =>
-    old
-      ? old.map((p) =>
-          p.id === postId ? { ...p, commentCount: p.commentCount + 1 } : p
-        )
-      : old
+  queryClient.setQueryData<InfiniteData<PostsPage>>(["posts"], (old) =>
+    updatePostInInfiniteCache(old, postId, (p) => ({
+      ...p,
+      commentCount: p.commentCount + 1,
+    }))
   );
 }

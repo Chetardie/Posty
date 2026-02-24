@@ -80,15 +80,27 @@ export type PostFeedItem = {
   isOwner: boolean;
 };
 
-export async function getPostsAction(): Promise<PostFeedItem[]> {
-  const user = await getCurrentUser();
+const POSTS_PAGE_SIZE = 5;
 
+export type GetPostsResult = {
+  posts: PostFeedItem[];
+  nextCursor: string | null;
+};
+
+export async function getPostsAction(
+  cursor?: string | null,
+  limit: number = POSTS_PAGE_SIZE
+): Promise<GetPostsResult> {
+  const user = await getCurrentUser();
   const cookieStore = await cookies();
   const guestId = cookieStore.get("guestId")?.value;
 
   const posts = await db.post.findMany({
     where: { deletedAt: null },
     orderBy: { createdAt: "desc" },
+    take: limit + 1,
+    skip: cursor ? 1 : 0,
+    ...(cursor ? { cursor: { id: cursor } } : {}),
     include: {
       author: { select: { name: true } },
       comments: { where: { deletedAt: null }, select: { id: true } },
@@ -96,26 +108,33 @@ export async function getPostsAction(): Promise<PostFeedItem[]> {
     },
   });
 
-  return posts.map((post) => ({
-    id: post.id,
-    content: post.content,
-    imageUrl: post.imageUrl,
-    authorName: post.author?.name || "Anonymous",
-    createdAt: post.createdAt.toISOString(),
-    commentCount: post.comments.length,
-    likeCount: post.likes.length,
-    isLiked: post.likes.some(
-      (like) =>
-        (user && like.userId === user.id) ||
-        (guestId && like.guestId === guestId)
-    ),
-    authorId: post.authorId,
-    guestId: post.guestId,
-    isOwner: Boolean(
-      (user && post.authorId === user.id) ||
-      (!user && guestId && post.guestId === guestId)
-    ),
-  }));
+  const hasMore = posts.length > limit;
+  const slice = hasMore ? posts.slice(0, limit) : posts;
+  const nextCursor = hasMore ? slice[slice.length - 1].id : null;
+
+  return {
+    posts: slice.map((post) => ({
+      id: post.id,
+      content: post.content,
+      imageUrl: post.imageUrl,
+      authorName: post.author?.name || "Anonymous",
+      createdAt: post.createdAt.toISOString(),
+      commentCount: post.comments.length,
+      likeCount: post.likes.length,
+      isLiked: post.likes.some(
+        (like) =>
+          (user && like.userId === user.id) ||
+          (guestId && like.guestId === guestId)
+      ),
+      authorId: post.authorId,
+      guestId: post.guestId,
+      isOwner: Boolean(
+        (user && post.authorId === user.id) ||
+        (!user && guestId && post.guestId === guestId)
+      ),
+    })),
+    nextCursor,
+  };
 }
 
 export async function updatePostAction(

@@ -1,8 +1,10 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { PostFeedItem } from "@/lib/actions/post";
 import type { CommentType } from "../post-comments";
+import { updatePostInInfiniteCache } from "../utils/posts-query";
+import type { PostsPage } from "../utils/posts-query";
+import type { InfiniteData } from "@tanstack/react-query";
 import {
   deleteCommentAction,
   updateCommentAction,
@@ -49,14 +51,11 @@ export function useCommentMutations({
     onSuccess: (result) => {
       if (result.success && "deletedCount" in result) {
         const deletedCount = result.deletedCount;
-        queryClient.setQueryData<PostFeedItem[]>(["posts"], (old) =>
-          old
-            ? old.map((p) =>
-                p.id === comment.postId
-                  ? { ...p, commentCount: Math.max(0, p.commentCount - deletedCount) }
-                  : p
-              )
-            : old
+        queryClient.setQueryData<InfiniteData<PostsPage>>(["posts"], (old) =>
+          updatePostInInfiniteCache(old, comment.postId, (p) => ({
+            ...p,
+            commentCount: Math.max(0, p.commentCount - deletedCount),
+          }))
         );
         const commentsKey = ["comments", comment.postId] as const;
         if (!parentId) {
