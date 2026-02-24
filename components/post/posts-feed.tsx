@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useEffect, useLayoutEffect, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useState, useReducer } from "react";
+import { flushSync } from "react-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { getPostsAction } from "@/lib/actions/post";
@@ -15,6 +16,7 @@ export function PostsFeed() {
   const listRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
+  const [, forceRender] = useReducer(() => ({}), {});
   const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } =
     useInfiniteQuery({
       queryKey: ["posts"],
@@ -36,6 +38,11 @@ export function PostsFeed() {
     overscan: OVERSCAN,
     scrollMargin,
     getItemKey: (index) => posts[index]?.id ?? index,
+    onChange: (_, sync) => {
+      if (!sync) {
+        queueMicrotask(() => flushSync(forceRender));
+      }
+    },
   });
 
   useEffect(() => {

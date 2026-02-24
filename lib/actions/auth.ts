@@ -5,9 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signupSchema } from "@/lib/validations/auth";
 import { db } from "@/lib/db";
 
-export type ActionResult =
-  | { success: true }
-  | { success: false; error: string };
+import type { ActionResult } from "./types";
 
 export async function loginAction(data: FormData): Promise<ActionResult> {
   const email = data.get("email");

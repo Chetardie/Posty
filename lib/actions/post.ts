@@ -7,12 +7,9 @@ import { createPostSchema, updatePostSchema } from "@/lib/validations/post";
 import { getCurrentUser } from "./auth";
 import { uploadImage } from "@/lib/supabase/storage";
 import { tryCatch } from "@/lib/try-catch";
+import type { ActionResult } from "./types";
 
 const BUCKET = "post-images";
-
-export type ActionResult =
-  | { success: true }
-  | { success: false; error: string };
 
 export async function createPostAction(
   formData: FormData

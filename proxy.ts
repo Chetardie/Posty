@@ -1,8 +1,13 @@
-import { type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
 
-export async function proxy(request: NextRequest) {
-  return await updateSession(request);
+export default async function proxy(request: NextRequest) {
+  const { response, user } = await updateSession(request);
+  const pathname = request.nextUrl.pathname;
+  if (user && (pathname === "/login" || pathname === "/signup")) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+  return response;
 }
 
 export const config = {

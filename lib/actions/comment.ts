@@ -10,12 +10,9 @@ import {
 import { getCurrentUser } from "./auth";
 import { uploadImage } from "@/lib/supabase/storage";
 import { tryCatch } from "@/lib/try-catch";
+import type { ActionResult } from "./types";
 
 const BUCKET = "comment-images";
-
-export type ActionResult =
-  | { success: true }
-  | { success: false; error: string };
 
 export type DeleteCommentResult =
   | { success: true; deletedCount: number }

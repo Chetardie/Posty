@@ -28,16 +28,25 @@ Prefer Server Actions over API routes. Re-validate with Zod on the server. Retur
 
 ```
 lib/
-  actions/       auth.ts, post.ts
-  validations/   auth.ts, post.ts
+  actions/       auth.ts, post.ts, comment.ts, user-activity.ts, types.ts
+  validations/   auth.ts, post.ts, comment.ts
   db.ts          Prisma singleton
-  supabase/      client, server, proxy
+  env.ts         validated env (Supabase, used by supabase/ and db)
+  supabase/      client, server, proxy (session refresh), storage
+  providers/     auth-provider, query-provider
 components/
   auth/          login-form, signup-form
-  post/          create-post-form
+  post/          create-post-form, create-post-trigger, post-card, posts-feed,
+                 post-comments, comment-input, comment-item, etc.
+                 hooks/   use-comment-replies, use-comment-edit, use-comment-mutations,
+                          use-post-edit, use-post-card-mutations
+                 utils/   posts-query, comment-cache
   ui/            shadcn primitives
-app/             page, login, signup
-prisma/         schema, migrations
+  header.tsx
+app/             layout, page, loading, error, not-found, global-error
+                login/, signup/
+proxy.ts        Supabase session refresh, auth redirects (login/signup -> /)
+prisma/          schema, migrations
 ```
 
 ## Validation
