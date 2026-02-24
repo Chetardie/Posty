@@ -45,6 +45,7 @@ export function CommentInput({
           queryClient.invalidateQueries({ queryKey: ["replies", parentId] });
         } else {
           queryClient.invalidateQueries({ queryKey: ["comments", postId] });
+          queryClient.invalidateQueries({ queryKey: ["posts"] });
         }
       } else {
         alert(result.error);

@@ -17,6 +17,10 @@ export type ActionResult =
   | { success: true }
   | { success: false; error: string };
 
+export type DeleteCommentResult =
+  | { success: true; deletedCount: number }
+  | { success: false; error: string };
+
 export async function createCommentAction(
   formData: FormData
 ): Promise<ActionResult> {
@@ -130,7 +134,9 @@ export async function updateCommentAction(
   return { success: true };
 }
 
-export async function deleteCommentAction(id: string): Promise<ActionResult> {
+export async function deleteCommentAction(
+  id: string
+): Promise<DeleteCommentResult> {
   const comment = await db.comment.findUnique({
     where: { id },
   });
@@ -151,12 +157,23 @@ export async function deleteCommentAction(id: string): Promise<ActionResult> {
     return { success: false, error: "Unauthorized: You are not the author" };
   }
 
+  const descendantIds: string[] = [];
+  let parentIds: string[] = [id];
+  while (parentIds.length > 0) {
+    const replies = await db.comment.findMany({
+      where: { parentId: { in: parentIds } },
+      select: { id: true },
+    });
+    const newIds = replies.map((r) => r.id).filter((rid) => !descendantIds.includes(rid));
+    descendantIds.push(...newIds);
+    parentIds = newIds;
+  }
+
+  const idsToDelete = [id, ...descendantIds];
   const { error: dbDeleteError } = await tryCatch(
-    db.comment.update({
-      where: { id },
-      data: {
-        deletedAt: new Date(),
-      },
+    db.comment.updateMany({
+      where: { id: { in: idsToDelete } },
+      data: { deletedAt: new Date() },
     })
   );
 
@@ -165,7 +182,7 @@ export async function deleteCommentAction(id: string): Promise<ActionResult> {
   }
 
   revalidatePath("/");
-  return { success: true };
+  return { success: true, deletedCount: idsToDelete.length };
 }
 
 export async function toggleCommentLikeAction(

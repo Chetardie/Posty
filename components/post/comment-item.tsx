@@ -1,104 +1,77 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
+import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { Heart, MessageCircle, Pencil, Trash2, X, Check } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { type CommentType } from "./post-comments";
-import { CommentInput } from "./comment-input";
-import {
-  getRepliesAction,
-  deleteCommentAction,
-  updateCommentAction,
-  toggleCommentLikeAction,
-} from "@/lib/actions/comment";
 import { Input } from "@/components/ui/input";
+import type { CommentType } from "./post-comments";
+import { CommentInput } from "./comment-input";
+import { useCommentReplies } from "./hooks/use-comment-replies";
+import { useCommentEdit } from "./hooks/use-comment-edit";
+import { useCommentMutations } from "./hooks/use-comment-mutations";
+import { applyReplySuccessToCache } from "./utils/comment-cache";
 
-export function CommentItem({ comment }: { comment: CommentType }) {
+type CommentItemProps = {
+  comment: CommentType;
+  parentId?: string;
+  ancestorIds?: string[];
+};
+
+export function CommentItem({
+  comment,
+  parentId,
+  ancestorIds = [],
+}: CommentItemProps) {
   const queryClient = useQueryClient();
-  const [showReplies, setShowReplies] = useState(false);
   const [showReplyInput, setShowReplyInput] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(comment.content);
 
   const {
-    data: replies = [],
-    isLoading: isLoadingReplies,
-    refetch: fetchReplies,
-  } = useQuery({
-    queryKey: ["replies", comment.id],
-    queryFn: () => getRepliesAction(comment.id),
-    enabled: showReplies,
-  });
+    showReplies,
+    setShowReplies,
+    replies,
+    isLoadingReplies,
+    fetchReplies,
+    toggleReplies,
+  } = useCommentReplies(comment.id);
 
-  const handleToggleReplies = () => {
-    setShowReplies(!showReplies);
-  };
+  const {
+    isEditing,
+    editContent,
+    setEditContent,
+    startEdit,
+    cancelEdit,
+    buildUpdateFormData,
+  } = useCommentEdit({ id: comment.id, content: comment.content });
 
-  const updateMutation = useMutation({
-    mutationFn: (formData: FormData) => updateCommentAction(formData),
-    onSuccess: (result) => {
-      if (result.success) {
-        setIsEditing(false);
-        queryClient.invalidateQueries({
-          queryKey: ["comments", comment.postId],
-        });
-        queryClient.invalidateQueries({ queryKey: ["replies", comment.id] });
-      } else {
-        alert(result.error);
-      }
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteCommentAction(comment.id),
-    onSuccess: (result) => {
-      if (result.success) {
-        queryClient.invalidateQueries({
-          queryKey: ["comments", comment.postId],
-        });
-        queryClient.invalidateQueries({ queryKey: ["replies"] });
-      } else {
-        alert(result.error);
-      }
-    },
-  });
-
-  const handleDelete = async () => {
-    if (confirm("Are you sure you want to delete this comment?")) {
-      deleteMutation.mutate();
+  const { handleDelete, handleUpdate, handleLike, isPending } = useCommentMutations(
+    {
+      comment,
+      parentId,
+      ancestorIds,
+      onUpdateSuccess: () => cancelEdit(),
     }
-  };
+  );
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  const handleSubmitUpdate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editContent.trim()) return;
-
-    const formData = new FormData();
-    formData.append("id", comment.id);
-    formData.append("content", editContent);
-
-    updateMutation.mutate(formData);
+    const formData = buildUpdateFormData();
+    if (formData) handleUpdate(formData);
   };
 
-  const likeMutation = useMutation({
-    mutationFn: () => toggleCommentLikeAction(comment.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["comments", comment.postId] });
-      queryClient.invalidateQueries({ queryKey: ["replies", comment.id] });
-    },
-  });
-
-  const handleLike = () => {
-    likeMutation.mutate();
+  const handleReplySuccess = () => {
+    setShowReplyInput(false);
+    setShowReplies(true);
+    fetchReplies();
+    applyReplySuccessToCache({
+      queryClient,
+      postId: comment.postId,
+      commentId: comment.id,
+      parentId,
+      ancestorIds,
+    });
   };
-
-  const isPending =
-    updateMutation.isPending ||
-    deleteMutation.isPending ||
-    likeMutation.isPending;
 
   return (
     <div className="flex flex-col">
@@ -125,7 +98,7 @@ export function CommentItem({ comment }: { comment: CommentType }) {
           </div>
 
           {isEditing ? (
-            <form onSubmit={handleUpdate} className="mt-1 flex flex-col gap-2">
+            <form onSubmit={handleSubmitUpdate} className="mt-1 flex flex-col gap-2">
               <Input
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
@@ -142,10 +115,7 @@ export function CommentItem({ comment }: { comment: CommentType }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setEditContent(comment.content);
-                  }}
+                  onClick={cancelEdit}
                   className="bg-muted text-foreground hover:bg-muted/80 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
                 >
                   <X className="size-3" /> Cancel
@@ -160,7 +130,7 @@ export function CommentItem({ comment }: { comment: CommentType }) {
 
           <div className="text-muted-foreground mt-2 flex items-center gap-6 text-xs">
             <button
-              onClick={handleToggleReplies}
+              onClick={toggleReplies}
               className="group flex items-center gap-1.5 transition-colors outline-none hover:text-blue-500"
             >
               <div className="-ml-1.5 rounded-full p-1.5 transition-colors group-hover:bg-blue-500/10">
@@ -172,7 +142,7 @@ export function CommentItem({ comment }: { comment: CommentType }) {
             <button
               className={`group flex items-center gap-1.5 transition-colors outline-none ${comment.isLiked ? "text-pink-600" : "hover:text-pink-600"}`}
               onClick={handleLike}
-              disabled={likeMutation.isPending}
+              disabled={isEditing}
             >
               <div
                 className={`-ml-1.5 rounded-full p-1.5 transition-colors ${comment.isLiked ? "" : "group-hover:bg-pink-600/10"}`}
@@ -194,7 +164,7 @@ export function CommentItem({ comment }: { comment: CommentType }) {
             {comment.isOwner && (
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setIsEditing(true)}
+                  onClick={startEdit}
                   className="p-1 transition-colors hover:text-blue-500"
                   title="Edit comment"
                 >
@@ -219,11 +189,7 @@ export function CommentItem({ comment }: { comment: CommentType }) {
           <CommentInput
             postId={comment.postId}
             parentId={comment.id}
-            onSuccess={() => {
-              setShowReplyInput(false);
-              setShowReplies(true);
-              fetchReplies();
-            }}
+            onSuccess={handleReplySuccess}
           />
         </div>
       )}
@@ -237,7 +203,12 @@ export function CommentItem({ comment }: { comment: CommentType }) {
           ) : replies.length > 0 ? (
             <div className="flex flex-col">
               {replies.map((reply) => (
-                <CommentItem key={reply.id} comment={reply} />
+                <CommentItem
+                  key={reply.id}
+                  comment={reply}
+                  parentId={comment.id}
+                  ancestorIds={[comment.id, ...ancestorIds]}
+                />
               ))}
             </div>
           ) : (
